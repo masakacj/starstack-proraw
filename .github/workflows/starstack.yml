@@ -1,0 +1,34 @@
+name: ProRAW Star Stack
+on:
+  push:
+    paths:
+      - 'raw/**.DNG'
+      - 'raw/**.dng'
+  workflow_dispatch:
+jobs:
+  stack:
+    runs-on: macos-15
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check inputs
+        run: |
+          echo "DNG files:"
+          find raw -type f \( -iname '*.dng' \) -print
+          test "$(find raw -type f -iname '*.dng' | wc -l | tr -d ' ')" -ge 2
+      - name: Compile Apple ProRAW decoder
+        run: swiftc tools/proraw_decode.swift -o /tmp/proraw_decode -framework CoreImage -framework ImageIO -framework UniformTypeIdentifiers
+      - name: Decode with Apple Core Image RAW pipeline
+        run: |
+          mkdir -p decoded
+          /tmp/proraw_decode raw decoded
+      - name: Install stack dependencies
+        run: python3 -m pip install --user numpy pillow opencv-python-headless
+      - name: Align stars and stack
+        run: python3 tools/stack.py
+      - name: Upload results
+        uses: actions/upload-artifact@v4
+        with:
+          name: starstack-results
+          path: output/
+          retention-days: 14
